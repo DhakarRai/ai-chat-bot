@@ -1,42 +1,209 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Simple AI Chatbot</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AI Chatbot</title>
     <style>
-        body { font-family: Arial; background:#f4f4f4; }
-        .chat-box { width:400px; margin:50px auto; background:white; padding:20px; }
-        .messages { height:300px; overflow-y:auto; border:1px solid #ccc; padding:10px; }
-        input { width:80%; padding:10px; }
-        button { padding:10px; }
+        :root{
+            --bg:#f4f7fb;
+            --card:#ffffff;
+            --accent:#4b7bec;
+            --muted:#7b8794;
+            --user:#daf1ff;
+            --bot:#f1f5ff;
+            --radius:14px;
+            --gap:12px;
+            --shadow: 0 6px 18px rgba(33,40,50,0.08);
+        }
+        *{box-sizing:border-box}
+        html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;color:#1f2937;background:var(--bg)}
+        .app{max-width:960px;margin:24px auto;height:calc(100vh - 48px);display:flex;gap:20px;padding:16px}
+        .panel{background:var(--card);border-radius:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+        .left{flex:1;min-width:260px;max-width:320px;padding:18px;display:flex;flex-direction:column}
+        .header{display:flex;align-items:center;gap:12px}
+        .avatar{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#6dd3ff,#4b7bec);display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
+        .title{font-size:16px;font-weight:600}
+        .subtitle{font-size:12px;color:var(--muted)}
+
+        .right{flex:2;display:flex;flex-direction:column}
+        .chat-area{flex:1;padding:12px 18px 8px;display:flex;flex-direction:column;gap:12px}
+        .messagesWrap{flex:1;position:relative;overflow:hidden;padding:6px}
+        .messagesInner{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:10px;padding:8px 4px}
+
+        .bubble{max-width:78%;padding:10px 14px;border-radius:12px;line-height:1.35}
+        .bubble.user{align-self:flex-end;background:var(--user);border-bottom-right-radius:6px}
+        .bubble.bot{align-self:flex-start;background:var(--bot);border-bottom-left-radius:6px}
+        .meta{font-size:11px;color:var(--muted);margin-top:6px}
+
+        .typing{display:flex;align-items:center;gap:8px;padding:8px}
+        .dots{width:36px;height:12px;display:flex;gap:4px;align-items:center}
+        .dot{width:8px;height:8px;background:#cbd5e1;border-radius:50%;animation:blink 1s infinite}
+        .dot:nth-child(2){animation-delay:.15s}
+        .dot:nth-child(3){animation-delay:.3s}
+        @keyframes blink{0%{opacity:.2}50%{opacity:1}100%{opacity:.2}}
+
+        .composer{display:flex;padding:12px;border-top:1px solid #eef2f6;background:linear-gradient(180deg,transparent,rgba(0,0,0,0.02))}
+        textarea{flex:1;resize:none;border:1px solid #e6edf6;padding:10px 12px;border-radius:10px;font-size:14px;outline:none}
+        .send-btn{background:var(--accent);color:white;border:none;padding:10px 14px;margin-left:10px;border-radius:10px;cursor:pointer}
+        .send-btn:disabled{opacity:.6;cursor:not-allowed}
+
+        /* responsive */
+        @media (max-width:800px){
+            .app{flex-direction:column;height:100vh;padding:8px}
+            .left{order:2;max-width:none;width:100%;padding:12px}
+            .right{order:1}
+        }
     </style>
 </head>
 <body>
 
-<div class="chat-box">
-    <h3>AI Chatbot 🤖</h3>
-    <div class="messages" id="messages"></div><br>
-    <input id="msg" placeholder="Type message..." />
-    <button onclick="send()">Send</button>
+<div class="app" style="max-width:720px;">
+    <div class="panel right" style="width:100%">
+        <div class="chat-area">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px 0">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <div class="avatar" style="width:38px;height:38px;border-radius:9px">AI</div>
+                    <div>
+                        <div class="title">AI Chatbot</div>
+                        <div class="subtitle">Fast, friendly responses</div>
+                    </div>
+                </div>
+                <div style="font-size:13px;color:var(--muted)">Tips: Enter to send • Shift+Enter new line</div>
+            </div>
+
+            <div id="messagesWrap" class="messagesWrap" role="presentation">
+                <div id="messagesInner" class="messagesInner" role="log" aria-live="polite"></div>
+            </div>
+
+            <div id="typing" class="typing" style="display:none">
+                <div class="bubble bot">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <div class="dots">
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                        </div>
+                        <div style="font-size:13px;color:var(--muted)">AI is thinking</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="composer">
+            <form id="chatForm" style="display:flex;flex:1;gap:10px;width:100%" onsubmit="return false">
+                <textarea id="msg" rows="1" placeholder="Ask me anything..." aria-label="Message input"></textarea>
+                <button id="sendBtn" class="send-btn" aria-label="Send message">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </form>
+        </div>
+    </div>
 </div>
 
 <script>
-async function send() {
-    let msg = document.getElementById("msg").value;
-    if (!msg) return;
+const messagesWrap = document.getElementById('messagesWrap');
+const messagesEl = document.getElementById('messagesInner');
+const typingEl = document.getElementById('typing');
+const msgInput = document.getElementById('msg');
+const sendBtn = document.getElementById('sendBtn');
 
-    let messages = document.getElementById("messages");
-    messages.innerHTML += "<b>You:</b> " + msg + "<br>";
-
-    let res = await fetch("/chat", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({message: msg})
-    });
-
-    let data = await res.json();
-    messages.innerHTML += "<b>Bot:</b> " + data.reply + "<br><br>";
-    document.getElementById("msg").value = "";
+function now(){
+    const d = new Date();
+    return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
 }
+
+
+function appendMessage(text, who='bot'){
+    const wrap = document.createElement('div');
+    wrap.className = 'bubble ' + (who==='user' ? 'user' : 'bot');
+    const content = document.createElement('div');
+    content.innerHTML = text.replace(/\n/g,'<br>');
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = now();
+    wrap.appendChild(content);
+    wrap.appendChild(meta);
+    wrap.style.opacity = 0;
+    messagesEl.appendChild(wrap);
+    // entrance
+    requestAnimationFrame(()=>{ wrap.style.transition='opacity .12s ease, transform .14s ease'; wrap.style.opacity=1; wrap.style.transform='translateY(0)'; });
+    fitMessages();
+}
+
+function scrollToBottom(){
+    // replaced by fitMessages which scales content to fit; keep for compatibility
+    fitMessages();
+}
+
+function fitMessages(){
+    const minScale = 0.45;
+    if(!messagesWrap || !messagesEl) return;
+    // reset transform to measure natural height
+    messagesEl.style.transform = 'none';
+    const available = messagesWrap.clientHeight - 6;
+    const contentH = messagesEl.scrollHeight;
+    let scale = 1;
+    if(contentH > available && contentH > 0){
+        scale = available / contentH;
+    }
+    scale = Math.max(minScale, Math.min(1, scale));
+    messagesEl.style.transformOrigin = 'bottom left';
+    messagesEl.style.transform = `scale(${scale})`;
+}
+
+function setTyping(visible){
+    typingEl.style.display = visible ? 'block' : 'none';
+    scrollToBottom();
+}
+
+function growTextarea(el){
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 180) + 'px';
+}
+
+msgInput.addEventListener('input', ()=> growTextarea(msgInput));
+
+msgInput.addEventListener('keydown', async (e)=>{
+    if(e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+        await send();
+    }
+});
+
+sendBtn.addEventListener('click', send);
+
+async function send(){
+    const text = msgInput.value.trim();
+    if(!text) return;
+    appendMessage(text, 'user');
+    msgInput.value = '';
+    growTextarea(msgInput);
+
+    // show typing indicator
+    setTyping(true);
+    sendBtn.disabled = true;
+
+    try{
+        const res = await fetch('/chat', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({message: text})
+        });
+        if(!res.ok) throw new Error('Network error');
+        const data = await res.json();
+        appendMessage(data.reply || 'Sorry, no response.', 'bot');
+    }catch(err){
+        appendMessage('Error: '+ (err.message||'request failed'), 'bot');
+    }finally{
+        setTyping(false);
+        sendBtn.disabled = false;
+    }
+}
+
+// small accessibility: focus input on load
+window.addEventListener('load', ()=> msgInput.focus());
+
 </script>
 
 </body>
